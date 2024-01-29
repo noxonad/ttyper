@@ -1,21 +1,28 @@
-format ELF executable 3
-entry start
+format ELF64
+public main
 
-segment readable executable
+extrn initscr
+extrn endwin
+extrn getch
 
-start:
+;
+; Data
+;
+section '.data' writable
 
-	mov	eax,4
-	mov	ebx,1
-	mov	ecx,msg
-	mov	edx,msg_size
-	int	0x80
+;
+; Code
+;
+section '.text' executable
+main:
+  sub rsp, 8
+  call initscr
+  _while_loop:
+    call getch
+    cmp ax, 'q'
+    jne _while_loop
+  call endwin
 
-	mov	eax,1
-	xor	ebx,ebx
-	int	0x80
-
-segment readable writeable
-
-msg db 'Hello world!',0xA
-msg_size = $-msg
+  mov rax, 60 ; exit
+  mov rdi, 0  ; error_code
+  syscall

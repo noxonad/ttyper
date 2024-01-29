@@ -1,1 +1,4 @@
 ttyper
+main
+*.o
+*.dump
