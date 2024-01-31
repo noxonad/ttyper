@@ -2,3 +2,4 @@ ttyper
 main
 *.o
 *.dump
+main.*

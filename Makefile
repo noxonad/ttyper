@@ -1,8 +1,9 @@
 CC=./fasm
 CFLAGS=-Wall -Wextra -ggdb -O0 -Wunreachable-code
 CLIBS=-lc -lncurses
-OBJ=*.o *.dump main
+CLEAR=*.o *.dump main
 TARGET=ttyper
+OBJ=ttyper.o
 .PHONY: default build run dump hex
 
 default: build run
@@ -21,4 +22,4 @@ hex: build $(TARGET)
 	hexedit $(TARGET)
 
 clean:
-	rm -f $(TARGET) $(OBJ)
+	rm -f $(TARGET) $(CLEAR)
