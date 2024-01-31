@@ -1,5 +1,5 @@
 CC=./fasm
-CFLAGS=-Wall -Wextra -ggdb -O0 -Wunreachable-code
+CFLAGS=-Wall -O0
 CLIBS=-lc -lncurses
 CLEAR=*.o *.dump main
 TARGET=ttyper
@@ -10,7 +10,7 @@ default: build run
 
 build: ttyper.asm
 	$(CC) ttyper.asm
-	gcc $(CLIBS) $(OBJ) -o $(TARGET)
+	gcc $(CFLAGS) $(CLIBS) $(OBJ) -o $(TARGET)
 
 run: $(TARGET)
 	./$(TARGET)

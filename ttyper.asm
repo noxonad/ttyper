@@ -5,31 +5,32 @@ extrn initscr
 extrn noecho
 extrn endwin
 extrn getch
+extrn printw
 extrn mvprintw
 extrn move
+extrn refresh
+
+define KEY_ESC    0x1B
+define KEY_SPACE  0x20
+define KEY_DEL    0x7F
 
 ;
 ; Data
 ;
 section '.data' writable
-stext db '%s', 0xA, 0
-hello_text db 'hello world', 0
+ctext db '%c', 0
+stext db '%s', 0
+hello_text db 'Hello, world!Hello, world!', 0
 hello_text_size = $-hello_text
 
 ; Terminal size
 termx dw 0
 termy dw 0
 
-macro _print_text x*, y*, text* {
-  mov rsi, y
-  mov rdi, x
-  mov rcx, stext
-  mov rdx, text
+macro _print_text y*, x*, text* {
+  mov rdx, stext
+  mov rcx, text
   call mvprintw
-
-  mov rsi, y
-  mov rdi, x
-  call move
 }
 
 ;
@@ -50,14 +51,37 @@ main:
 
 
   ; Print text
-  mov rsi, hello_text_size
+  mov rdi, hello_text_size ; get the center position of the text
   call _get_center_position
-  _print_text rdi, rsi, hello_text
+  _print_text rdi, rsi, hello_text ; print the text
+
+  ; Move the cursor to the start of the text
+  mov rdi, hello_text_size
+  call _get_center_position
+  call move
+
 
   _while_loop:
     call getch
-    cmp ax, 'q'
-    jne _while_loop
+    ; If ESC, exit
+    cmp ax, KEY_ESC
+    je _exit
+
+    ; Check if key is printable
+    ; Try again if it's not
+    cmp ax, KEY_SPACE
+    jl _while_loop
+    cmp ax, KEY_DEL
+    jge _while_loop
+
+    ; Todo: abstract into a function/macros
+    ; Print single character
+    mov edi, ctext
+    movsx esi, ax
+    call printw
+    jmp _while_loop
+  call getch
+  _exit:
   call endwin
 
   mov rax, 60 ; exit
@@ -66,25 +90,18 @@ main:
 
 ;
 ; Input:
-;  rsi - text len
+;  rdi - text len
 ; Output:
-;  rsi - x
 ;  rdi - y
+;  rsi - x
 ;
 _get_center_position:
-  push rbx
-  ; xor rdi, rdi
-  ; xor rbx, rbx
+  ; Set x = (termy - text_len)/2
+  movsx rsi, word [termx]
+  sub rsi, rdi
+  shr rsi, 1
 
   ; Set y = termx / 2
   movsx rdi, word [termy]
   shr rdi, 1
-
-  ; Set x = (termy - text_len)/2
-  movsx rbx, word [termx]
-  sub rbx, rsi
-  shr rbx, 1
-  mov rsi, rbx
-
-  pop rbx
-ret
+  ret
