@@ -1,7 +1,7 @@
 CC=./fasm
 CFLAGS=-Wall -Wextra -ggdb -O0 -Wunreachable-code
 CLIBS=-lc -lncurses
-OBJ=ttyper.o
+OBJ=*.o *.dump main
 TARGET=ttyper
 .PHONY: default build run dump hex
 
