@@ -10,9 +10,11 @@ extrn mvprintw
 extrn move
 extrn refresh
 
-define KEY_ESC    0x1B
-define KEY_SPACE  0x20
-define KEY_DEL    0x7F
+define KEY_ENTER      0x0A
+define KEY_ESC        0x1B
+define KEY_SPACE      0x20
+define KEY_DEL        0x7E
+define KEY_BACKSPACE  0x7F
 
 ;
 ; Data
@@ -20,8 +22,9 @@ define KEY_DEL    0x7F
 section '.data' writable
 ctext db '%c', 0
 stext db '%s', 0
-hello_text db 'Hello, world!Hello, world!', 0
+hello_text db 'Hello, world!', 0
 hello_text_size = $-hello_text
+user_char_write dd 0 ; How many characters has user written (max 65535)
 
 ; Terminal size
 termx dw 0
@@ -67,6 +70,22 @@ main:
     cmp ax, KEY_ESC
     je _exit
 
+    ; Remove a character at backspace
+    cmp ax, KEY_BACKSPACE
+    jne _backspace_pass
+      dec [user_char_write]
+      cmp [user_char_write], 0
+      jge _user_len_neg_pass
+        inc [user_char_write]
+      _user_len_neg_pass:
+      mov rdi, hello_text_size
+      call _get_center_position
+      add esi, [user_char_write]
+      call move
+      jmp _while_loop
+
+    _backspace_pass:
+
     ; Check if key is printable
     ; Try again if it's not
     cmp ax, KEY_SPACE
@@ -74,11 +93,26 @@ main:
     cmp ax, KEY_DEL
     jge _while_loop
 
+    ; Test for the end of a string
+    push rax
+    push rbx
+
+    xor rax, rax
+    mov eax, [user_char_write]
+    mov rbx, hello_text_size
+    dec rbx ; remove the null terminator
+    cmp eax, ebx
+    jge _while_loop
+
+    pop rbx
+    pop rax
+
     ; Todo: abstract into a function/macros
     ; Print single character
     mov edi, ctext
     movsx esi, ax
     call printw
+    inc [user_char_write]
     jmp _while_loop
   call getch
   _exit:
