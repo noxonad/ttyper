@@ -73,10 +73,9 @@ main:
     ; Remove a character at backspace
     cmp ax, KEY_BACKSPACE
     jne _backspace_pass
-      dec [user_char_write]
       cmp [user_char_write], 0
-      jge _user_len_neg_pass
-        inc [user_char_write]
+      jle _user_len_neg_pass
+        dec [user_char_write]
       _user_len_neg_pass:
       mov rdi, hello_text_size
       call _get_center_position
