@@ -1,12 +1,12 @@
 CC=./fasm
-CFLAGS=-Wall -O0
-CLIBS=-lc -lncurses
+CFLAGS=-Wall -O3
+CLIBS=-lncurses
 CLEAR=*.o *.dump main
 TARGET=ttyper
 OBJ=ttyper.o
 .PHONY: default build run dump hex
 
-default: build run
+default: build
 
 build: ttyper.asm
 	$(CC) ttyper.asm
