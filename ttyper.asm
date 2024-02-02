@@ -1,5 +1,5 @@
 format ELF64
-public main
+public _start
 
 extrn initscr
 extrn noecho
@@ -131,9 +131,7 @@ macro MOVE_CURSOR_TEXT_USER_CURRENT {
 ; Code
 ;
 section '.text' executable
-main:
-  sub rsp, 8
-
+_start:
   ; Initialize the screen
   call initscr
     ; Get terminal size

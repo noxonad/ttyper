@@ -1,6 +1,6 @@
 CC=./fasm
-CFLAGS=-Wall -O3
-CLIBS=-lncurses
+CFLAGS=-dynamic-linker /lib/ld-linux-x86-64.so.2
+CLIBS=-lc -lncurses
 CLEAR=*.o *.dump main
 TARGET=ttyper
 OBJ=ttyper.o
@@ -10,7 +10,7 @@ default: build
 
 build: ttyper.asm
 	$(CC) ttyper.asm
-	gcc $(CFLAGS) $(CLIBS) $(OBJ) -o $(TARGET)
+	ld ttyper.o $(CLIBS) $(CFLAGS) -o $(TARGET)
 
 run: build $(TARGET)
 	./$(TARGET)
