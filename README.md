@@ -27,5 +27,5 @@ The app isn't creating files other than in the current folder, so removing the f
 
 If you want to delete the binaries only, run the following command:
 ```console
-make clean
+$ make clean
 ```
