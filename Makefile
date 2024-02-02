@@ -12,7 +12,7 @@ build: ttyper.asm
 	$(CC) ttyper.asm
 	gcc $(CFLAGS) $(CLIBS) $(OBJ) -o $(TARGET)
 
-run: $(TARGET)
+run: build $(TARGET)
 	./$(TARGET)
 
 dump: build $(TARGET)

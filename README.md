@@ -8,17 +8,25 @@ The application is written in [fasm](https://flatassembler.net/) and uses [ncurs
 
 ## Installation
 
-To make the installation easier, there's a Makefile. Simply run:
+To make the installation easier, there's a Makefile. To build the app simply run:
 ```console
-$ make build
-$ ./ttyper
+$ make
 ```
 
 Or you can manually build it:
 ```console
 $ ./fasm ttyper.asm
 $ gcc -lncurses ttyper.o -o ttyper
+```
+
+To run it you can either run it directly:
+```console
 $ ./ttyper
+```
+
+or via makefile:
+```console
+$ make run
 ```
 
 ## Removing
