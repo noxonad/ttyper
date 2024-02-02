@@ -22,7 +22,7 @@ define KEY_BACKSPACE  0x7F
 section '.data' writable
 ctext db '%c', 0
 stext db '%s', 0
-hello_text db 'Hello, world!', 0
+hello_text db 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Tempus egestas sed sed risus.', 0
 hello_text_size = $-hello_text
 user_char_write dd 0 ; How many characters has user written (max 65535)
 
@@ -30,10 +30,28 @@ user_char_write dd 0 ; How many characters has user written (max 65535)
 termx dw 0
 termy dw 0
 
-macro _print_text y*, x*, text* {
+macro PRINT_CHAR chr {
+  mov rdi, ctext
+  mov rsi, chr
+  call printw
+}
+macro PRINT_TEXT_AT y*, x*, text* {
   mov rdx, stext
   mov rcx, text
   call mvprintw
+}
+
+macro MOVE_CURSOR_TEXT_BEGIN {
+  mov rdi, hello_text_size
+  call _get_center_position
+  call move
+}
+
+macro MOVE_CURSOR_TEXT_USER_CURRENT {
+  mov rdi, hello_text_size
+  call _get_center_position
+  add esi, [user_char_write]
+  call move
 }
 
 ;
@@ -56,14 +74,11 @@ main:
   ; Print text
   mov rdi, hello_text_size ; get the center position of the text
   call _get_center_position
-  _print_text rdi, rsi, hello_text ; print the text
+  PRINT_TEXT_AT rdi, rsi, hello_text ; print the text
 
   ; Move the cursor to the start of the text
-  mov rdi, hello_text_size
-  call _get_center_position
-  call move
-
-
+  MOVE_CURSOR_TEXT_BEGIN
+  
   _while_loop:
     call getch
     ; If ESC, exit
@@ -73,14 +88,26 @@ main:
     ; Remove a character at backspace
     cmp ax, KEY_BACKSPACE
     jne _backspace_pass
+      ; Don't decrement if below 0
       cmp [user_char_write], 0
       jle _user_len_neg_pass
         dec [user_char_write]
+
       _user_len_neg_pass:
-      mov rdi, hello_text_size
-      call _get_center_position
-      add esi, [user_char_write]
-      call move
+
+      ; Move the cursor at the correct position
+      MOVE_CURSOR_TEXT_USER_CURRENT
+
+      ; Print back the character from the text
+      lea rsi, [hello_text]
+      movsx rdi, word [user_char_write]
+      call _get_char_at_offset
+      ; and rdi, 0xFF
+      PRINT_CHAR rsi
+
+      ; Move the cursor at the correct position
+      MOVE_CURSOR_TEXT_USER_CURRENT
+      
       jmp _while_loop
 
     _backspace_pass:
@@ -106,20 +133,21 @@ main:
     pop rbx
     pop rax
 
-    ; Todo: abstract into a function/macros
     ; Print single character
-    mov edi, ctext
-    movsx esi, ax
-    call printw
+    ; mov edi, ctext
+    ; movsx esi, ax
+    ; call printw
+    and rax, 0xFF
+    PRINT_CHAR rax
     inc [user_char_write]
     jmp _while_loop
-  call getch
-  _exit:
-  call endwin
 
-  mov rax, 60 ; exit
-  mov rdi, 0  ; error_code
-  syscall
+  _exit:
+    call endwin
+
+    mov rax, 60 ; exit
+    mov rdi, 0  ; error_code
+    syscall
 
 ;
 ; Input:
@@ -137,4 +165,16 @@ _get_center_position:
   ; Set y = termx / 2
   movsx rdi, word [termy]
   shr rdi, 1
+  ret
+
+;
+; Input:
+;  rdi - string address
+;  rsi - offset
+; Output:
+;  rsi - character at offset 
+;
+_get_char_at_offset:
+  add rdi, rsi
+  movzx rsi, byte [rdi]
   ret
