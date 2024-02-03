@@ -1,5 +1,5 @@
 CC=./fasm
-CFLAGS=-dynamic-linker /lib/ld-linux-x86-64.so.2
+CFLAGS=-dynamic-linker /lib64/ld-linux-x86-64.so.2
 CLIBS=-lc -lncurses
 CLEAR=*.o *.dump main
 TARGET=ttyper
