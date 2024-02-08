@@ -36,6 +36,7 @@ define COLOR_GREEN        0x02
 ; Color index
 define CORRECT_COLOR      0x01
 define WRONG_COLOR        0x02
+define SPACE_WRONG_COLOR  0x03
 
 
 
@@ -46,9 +47,11 @@ section '.data' writable
 ctype   db '%c', 0
 stype   db '%s', 0
 lutype  db '%lu', 0
-default_text db 'Qui nostrum blanditiis minus corporis quae. Dolorem eum voluptatem accusantium', 0 ; Text the user has to type
-hello_text_size = $-default_text ; Text length
+restype db 'Time: %lus - %lu mistakes - %.2f cpm / %.2f wpm - Accuracity: %.2f%%', 0
+default_text db 'A large rose-tree stood near the entrance of the garden: the roses growing on it were white, but there were three gardeners at it, busily painting them red.', 0 ; Text the user has to type
+default_text_size = $-default_text ; Text length
 
+user_mistakes dd 0 ; Number of total mistyped letters
 user_input dd 0 ; The key that user has pressed
 user_char_writen dw 0 ; Count of user written characters (considered per line)
 user_time_start_typing dq 0 ; When the user started typing the first character
@@ -78,6 +81,7 @@ macro INIT_NCURSES {
 
   INIT_PAIR CORRECT_COLOR, COLOR_DEFAULT, COLOR_GREEN
   INIT_PAIR WRONG_COLOR, COLOR_DEFAULT, COLOR_RED
+  INIT_PAIR SPACE_WRONG_COLOR, COLOR_RED, COLOR_DEFAULT
 }
 
 macro CLOSE_NCURSES {
@@ -93,7 +97,7 @@ macro INIT_PAIR pair*, fg*, bg* {
 
 macro PRINT_CHAR chr {
   mov rdi, ctype
-  mov rsi, chr
+  mov esi, chr
   call printw
 }
 
@@ -102,40 +106,20 @@ macro COLOR_PAIR pair* {
 }
 
 macro COLOR_ON pair* {
-  push rdi
-  push rsi
-  push rdx
-  push rax
-
   mov rdi, [stdscr]
   mov rsi, pair
   shl rsi, 8
   xor rdx, rdx
   call wattr_on
-
-  pop rax
-  pop rdx
-  pop rsi
-  pop rdi
 }
 
 macro COLOR_OFF pair* {
-  push rdi
-  push rsi
-  push rdx
-  push rax
-
   mov rdi, [stdscr]
   mov rsi, pair
   shl rsi, 8
 
   xor rdx, rdx
   call wattr_off
-
-  pop rax
-  pop rdx
-  pop rsi
-  pop rdi
 }
 
 macro PRINT_TEXT_AT y*, x*, text* {
@@ -147,7 +131,7 @@ macro PRINT_TEXT_AT y*, x*, text* {
 }
 
 macro PRINT_CENTERED_TEXT text* {
-  mov rdi, hello_text_size ; get the center position of the text
+  mov rdi, default_text_size ; get the center position of the text
   mov rsi, text
   call _get_center_position
   mov rdx, stype
@@ -157,13 +141,13 @@ macro PRINT_CENTERED_TEXT text* {
 }
 
 macro MOVE_CURSOR_TEXT_BEGIN {
-  mov rdi, hello_text_size
+  mov rdi, default_text_size
   call _get_center_position
   call move
 }
 
 macro MOVE_CURSOR_TEXT_USER_CURRENT {
-  mov rdi, hello_text_size
+  mov rdi, default_text_size
   call _get_center_position
   add si, [user_char_writen]
   call move
@@ -187,7 +171,7 @@ _start:
     ; Test for the end of a string
     xor rax, rax
     mov ax, [user_char_writen]
-    mov rbx, hello_text_size
+    mov rbx, default_text_size
     dec rbx ; remove the null terminator
     cmp eax, ebx
     jge _text_typed
@@ -223,7 +207,7 @@ _start:
       movzx rdi, word [user_char_writen]
       call _get_char_at_offset
       ; and rdi, 0xFF
-      PRINT_CHAR rsi
+      PRINT_CHAR esi
 
       ; Move the cursor at the correct position
       MOVE_CURSOR_TEXT_USER_CURRENT
@@ -251,19 +235,30 @@ _start:
 
     ; the character is correctly typed
       COLOR_ON CORRECT_COLOR
-      PRINT_CHAR rax
+      PRINT_CHAR [user_input]
       COLOR_OFF CORRECT_COLOR
       jmp _user_input_wrapup
 
     ; The character is not correctly typed
     _char_typed_wrong:
-      COLOR_ON WRONG_COLOR
-      PRINT_CHAR rax
-      COLOR_OFF WRONG_COLOR
+      inc [user_mistakes]
+      cmp rax, KEY_SPACE
+      je _wrong_input_space_skip
+        COLOR_ON WRONG_COLOR
+        PRINT_CHAR [user_input]
+        COLOR_OFF WRONG_COLOR
+        jmp _user_input_wrapup
+      _wrong_input_space_skip:
+        COLOR_ON SPACE_WRONG_COLOR
+        ; mov rsi, default_text
+        ; mov di, [user_char_writen]
+        ; call _get_char_at_offset
+        PRINT_CHAR [user_input]
+        COLOR_OFF SPACE_WRONG_COLOR
 
     _user_input_wrapup:
-    inc [user_char_writen]
-    jmp _while_loop
+      inc [user_char_writen]
+      jmp _while_loop
 
   ; Print the time
   _text_typed:
@@ -271,14 +266,44 @@ _start:
     xor rdi, rdi
     mov rax, SYS_TIME
     syscall
+    ; Calculate the difference
     mov rbx, [user_time_start_typing]
     sub rax, rbx
     
     ; Print the time
-    mov di, [termy]
-    xor rsi, rsi
-    mov rdx, lutype
-    mov rcx, rax
+    mov di, [termy]           ; y
+    xor rsi, rsi              ; x
+    mov rdx, restype          ; template 
+    mov rcx, rax              ; seconds
+    mov r8d, [user_mistakes]  ; mistakes
+
+    ; Calculate the cpm
+    cvtsi2sd xmm1, rax
+    mov rax, default_text_size
+    imul rax, 60              ; size * 60
+    cvtsi2sd xmm0, rax        ; size
+    divsd xmm0, xmm1          ; cpm = size * 60 / time
+
+    ; Calculate the wpm
+    ; wpm = cpm / 5
+    movsd xmm1, xmm0
+    mov rax, 5                ; 5 characters per word
+    cvtsi2sd xmm2, rax
+    divsd xmm1, xmm2
+
+    ; Calculate the accuracity percentage
+    xor rbx, rbx              ; (size - mistakes) / size * 100
+    mov rax, default_text_size
+    mov ebx, [user_mistakes]
+    sub rax, rbx              ; (size - mistakes)
+    imul rax, 100             ; ^^^^^^^^^^^^^^^^^ * 100
+    cvtsi2sd xmm2, rax
+    mov rax, default_text_size
+    cvtsi2sd xmm3, rax
+    divsd xmm2, xmm3          ; (mistakes * 100) / size
+
+    mov rax, 3                ; number of xmm args
+    
     call mvprintw
 
     call getch
