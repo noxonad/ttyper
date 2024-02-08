@@ -16,7 +16,7 @@ $ make
 Or you can manually build it:
 ```console
 $ ./fasm ttyper.asm
-$ gcc -lncurses ttyper.o -o ttyper
+$ ld ttyper.o -lc -lncurses -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o ttyper
 ```
 
 To run it you can either run it directly:
