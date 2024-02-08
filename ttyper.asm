@@ -250,10 +250,10 @@ _start:
         jmp _user_input_wrapup
       _wrong_input_space_skip:
         COLOR_ON SPACE_WRONG_COLOR
-        ; mov rsi, default_text
-        ; mov di, [user_char_writen]
-        ; call _get_char_at_offset
-        PRINT_CHAR [user_input]
+        mov rsi, default_text
+        movzx rdi, [user_char_writen]
+        call _get_char_at_offset
+        PRINT_CHAR esi
         COLOR_OFF SPACE_WRONG_COLOR
 
     _user_input_wrapup:
@@ -355,6 +355,6 @@ _set_time_start:
   syscall
   mov [user_time_start_typing], rax
 
-  pop rdi
   pop rax
+  pop rdi
   ret
