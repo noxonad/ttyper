@@ -15,6 +15,7 @@ extrn init_pair
 extrn wattr_on
 extrn wattr_off
 extrn stdscr
+extrn curs_set
 
 ; SYS_CALLS
 define SYS_EXIT           0x3C
@@ -38,16 +39,19 @@ define CORRECT_COLOR      0x01
 define WRONG_COLOR        0x02
 define SPACE_WRONG_COLOR  0x03
 
+define MIN_TERM           70
+
 
 
 ;
 ; Data
 ;
 section '.data' writable
-ctype   db '%c', 0
-stype   db '%s', 0
-lutype  db '%lu', 0
-restype db 'Time: %lus - %lu mistakes - %.2f cpm / %.2f wpm - Accuracity: %.2f%%', 0
+ctype     db '%c', 0
+stype     db '%s', 0
+lutype    db '%lu', 0
+stattype   db 'Time: %lus - %lu mistakes - %.2f cpm / %.2f wpm - Accuracity: %.2f%%', 0
+sstattype  db '%.2f cpm / %.2f wpm', 0
 default_text db 'A large rose-tree stood near the entrance of the garden: the roses growing on it were white, but there were three gardeners at it, busily painting them red.', 0 ; Text the user has to type
 default_text_size = $-default_text ; Text length
 
@@ -151,6 +155,17 @@ macro MOVE_CURSOR_TEXT_USER_CURRENT {
   call _get_center_position
   add si, [user_char_writen]
   call move
+}
+
+macro CURSES_HIDE_CURSOR {
+  xor rdi, rdi
+  call curs_set
+}
+
+macro CURSES_SHOW_CURSOR {
+  xor rdi, rdi
+  inc rdi
+  call curs_set
 }
 
 
@@ -269,44 +284,74 @@ _start:
     ; Calculate the difference
     mov rbx, [user_time_start_typing]
     sub rax, rbx
+
+    cmp [termx], MIN_TERM
+    jg _minify_skip
+      mov di, [termy]
+      xor rsi, rsi
+      mov rdx, sstattype
+      
+      ; Calculate the cpm
+      cvtsi2sd xmm1, rax
+      mov rax, default_text_size
+      imul rax, 60              ; size * 60
+      cvtsi2sd xmm0, rax        ; size
+      divsd xmm0, xmm1          ; cpm = size * 60 / time
+
+      ; Calculate the wpm
+      ; wpm = cpm / 5
+      movsd xmm1, xmm0
+      mov rax, 5                ; 5 characters per word
+      cvtsi2sd xmm2, rax
+      divsd xmm1, xmm2
+
+      mov rax, 2
+
+      call mvprintw
+
+      jmp _stat_wrapup
+
+    _minify_skip:
+      ; Print the time
+      mov di, [termy]           ; y
+      xor rsi, rsi              ; x
+      mov rdx, stattype          ; template 
+      mov rcx, rax              ; seconds
+      mov r8d, [user_mistakes]  ; mistakes
+
+      ; Calculate the cpm
+      cvtsi2sd xmm1, rax
+      mov rax, default_text_size
+      imul rax, 60              ; size * 60
+      cvtsi2sd xmm0, rax        ; size
+      divsd xmm0, xmm1          ; cpm = size * 60 / time
+
+      ; Calculate the wpm
+      ; wpm = cpm / 5
+      movsd xmm1, xmm0
+      mov rax, 5                ; 5 characters per word
+      cvtsi2sd xmm2, rax
+      divsd xmm1, xmm2
+
+      ; Calculate the accuracity percentage
+      xor rbx, rbx              ; (size - mistakes) / size * 100
+      mov rax, default_text_size
+      dec rax                   ; minus null terminator
+      mov ebx, [user_mistakes]
+      sub rax, rbx              ; (size - mistakes)
+      imul rax, 100             ; ^^^^^^^^^^^^^^^^^ * 100
+      cvtsi2sd xmm2, rax
+      mov rax, default_text_size
+      dec rax                   ; minus null terminator
+      cvtsi2sd xmm3, rax
+      divsd xmm2, xmm3          ; (mistakes * 100) / size
+
+      mov rax, 3                ; number of xmm args
     
-    ; Print the time
-    mov di, [termy]           ; y
-    xor rsi, rsi              ; x
-    mov rdx, restype          ; template 
-    mov rcx, rax              ; seconds
-    mov r8d, [user_mistakes]  ; mistakes
-
-    ; Calculate the cpm
-    cvtsi2sd xmm1, rax
-    mov rax, default_text_size
-    imul rax, 60              ; size * 60
-    cvtsi2sd xmm0, rax        ; size
-    divsd xmm0, xmm1          ; cpm = size * 60 / time
-
-    ; Calculate the wpm
-    ; wpm = cpm / 5
-    movsd xmm1, xmm0
-    mov rax, 5                ; 5 characters per word
-    cvtsi2sd xmm2, rax
-    divsd xmm1, xmm2
-
-    ; Calculate the accuracity percentage
-    xor rbx, rbx              ; (size - mistakes) / size * 100
-    mov rax, default_text_size
-    mov ebx, [user_mistakes]
-    sub rax, rbx              ; (size - mistakes)
-    imul rax, 100             ; ^^^^^^^^^^^^^^^^^ * 100
-    cvtsi2sd xmm2, rax
-    mov rax, default_text_size
-    cvtsi2sd xmm3, rax
-    divsd xmm2, xmm3          ; (mistakes * 100) / size
-
-    mov rax, 3                ; number of xmm args
-    
-    call mvprintw
-
-    call getch
+    _stat_wrapup:
+      call mvprintw
+      CURSES_HIDE_CURSOR
+      call getch
 
   _exit:
     CLOSE_NCURSES
