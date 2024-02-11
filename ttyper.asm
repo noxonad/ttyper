@@ -47,17 +47,17 @@ define MIN_TERM           70
 ; Data
 ;
 section '.data' writable
-ctype     db '%c', 0
-stype     db '%s', 0
-lutype    db '%lu', 0
-stattype   db 'Time: %lus - %lu mistakes - %.2f cpm / %.2f wpm - Accuracity: %.2f%%', 0
-sstattype  db '%.2f cpm / %.2f wpm', 0
+ctype db '%c', 0
+stype db '%s', 0
+lutype db '%lu', 0
+stattype db 'Time: %lus - %lu mistakes - %.2f cpm / %.2f wpm - Accuracity: %.2f%%', 0
+sstattype db '%.2f cpm / %.2f wpm', 0
 default_text db 'A large rose-tree stood near the entrance of the garden: the roses growing on it were white, but there were three gardeners at it, busily painting them red.', 0 ; Text the user has to type
 default_text_size = $-default_text ; Text length
 
 user_mistakes dd 0 ; Number of total mistyped letters
 user_input dd 0 ; The key that user has pressed
-user_char_writen dw 0 ; Count of user written characters (considered per line)
+user_char_writen dd 0 ; Count of user written characters (considered per line)
 user_time_start_typing dq 0 ; When the user started typing the first character
 
 ; Terminal size
@@ -153,7 +153,7 @@ macro MOVE_CURSOR_TEXT_BEGIN {
 macro MOVE_CURSOR_TEXT_USER_CURRENT {
   mov rdi, default_text_size
   call _get_center_position
-  add si, [user_char_writen]
+  add esi, [user_char_writen]
   call move
 }
 
@@ -185,7 +185,7 @@ _start:
   _while_loop:
     ; Test for the end of a string
     xor rax, rax
-    mov ax, [user_char_writen]
+    mov eax, [user_char_writen]
     mov rbx, default_text_size
     dec rbx ; remove the null terminator
     cmp eax, ebx
@@ -259,14 +259,16 @@ _start:
       inc [user_mistakes]
       cmp rax, KEY_SPACE
       je _wrong_input_space_skip
+        ; Wrong character typed
         COLOR_ON WRONG_COLOR
         PRINT_CHAR [user_input]
         COLOR_OFF WRONG_COLOR
         jmp _user_input_wrapup
       _wrong_input_space_skip:
+        ; Wrong typed space, print the character instead of the space
         COLOR_ON SPACE_WRONG_COLOR
         mov rsi, default_text
-        movzx rdi, [user_char_writen]
+        mov edi, [user_char_writen]
         call _get_char_at_offset
         PRINT_CHAR esi
         COLOR_OFF SPACE_WRONG_COLOR
@@ -285,6 +287,8 @@ _start:
     mov rbx, [user_time_start_typing]
     sub rax, rbx
 
+    ; When the terminal is less than 70 character wide
+    ; The stats are printed in a more concise format
     cmp [termx], MIN_TERM
     jg _minify_skip
       mov di, [termy]
@@ -315,7 +319,7 @@ _start:
       ; Print the time
       mov di, [termy]           ; y
       xor rsi, rsi              ; x
-      mov rdx, stattype          ; template 
+      mov rdx, stattype         ; template 
       mov rcx, rax              ; seconds
       mov r8d, [user_mistakes]  ; mistakes
 
@@ -347,7 +351,7 @@ _start:
       divsd xmm2, xmm3          ; (mistakes * 100) / size
 
       mov rax, 3                ; number of xmm args
-    
+        
     _stat_wrapup:
       call mvprintw
       CURSES_HIDE_CURSOR
