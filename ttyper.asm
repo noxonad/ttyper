@@ -61,8 +61,8 @@ user_char_writen dd 0 ; Count of user written characters (considered per line)
 user_time_start_typing dq 0 ; When the user started typing the first character
 
 ; Terminal size
-termx dw 0
-termy dw 0
+termx dw ?
+termy dw ?
 
 
 
@@ -197,7 +197,7 @@ _start:
 
     cmp [user_char_writen], 0
     jne _pass
-      call _set_time_start
+      call _set_user_type_time_start
     _pass:
 
     ; If ESC, exit
@@ -353,6 +353,7 @@ _start:
       mov rax, 3                ; number of xmm args
         
     _stat_wrapup:
+      ; Print the stats
       call mvprintw
       CURSES_HIDE_CURSOR
       call getch
@@ -395,8 +396,13 @@ _get_char_at_offset:
   movzx rsi, byte [rdi]
   ret
 
-_set_time_start:
-  push rdi
+;
+; Sets the current time into user_time_start_typing
+;
+; Input:  none
+; Output: none
+;
+_set_user_type_time_start:
   push rax
 
   xor rdi, rdi
@@ -405,5 +411,36 @@ _set_time_start:
   mov [user_time_start_typing], rax
 
   pop rax
-  pop rdi
+  ret
+
+;
+; Returns how many lines should the text be devided into
+; given the text length and the max size of one chunk
+;
+; It's a rough approximation of the line count but never will be less than
+; the actual line count
+;
+; Is supposed to be used when allocating memory for an array to get the
+; array size
+;
+; Input:
+;   rdi - text length
+;   rsi - chunk length (terminal width)
+;
+; Output:
+;   rdi - number of lines
+;
+_get_text_max_line_count:
+  push rax
+  push rdx
+
+  shr rsi, 1
+
+  mov rax, rdi
+  xor rdx, rdx
+  idiv rsi
+  mov rdi, rax
+  
+  pop rdx
+  pop rax
   ret
